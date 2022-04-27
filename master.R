@@ -1,12 +1,12 @@
 source("_dependencies/dependencies.R")
 
-d <- read_sheet(
+d.all <- read_sheet(
     "https://docs.google.com/spreadsheets/d/1OszN1ZltU3nPZYBskJuhuPzhh-Zn4gg7yvYRKOR_SSs/",
-    sheet = "BLL<>SWB time lagged"
+    sheet = "BLL<>SWB"
 )
 
-d <- d %>% filter(Citation != "Winter & Sampson, 2017")
-d <- d %>% rowwise() %>%
+d.childlag <- d.all %>% filter(analysis == "childhood-lag")
+d.childlag <- d.childlag %>% rowwise() %>%
     mutate(
         d = d/Dosage
     ) %>%
@@ -22,7 +22,7 @@ mod.1 <- rma.mv(yi = d, V = d_se^2,
        random =  ~1 | cohort,
        # mods = ~ `FU from lead measure in years`,
        test = "t", method="REML",
-       data = d)
+       data = d.childlag)
 
 effect <- coef(mod.1)[[1]]; effect
 linear.growth <- abs(effect/27); linear.growth

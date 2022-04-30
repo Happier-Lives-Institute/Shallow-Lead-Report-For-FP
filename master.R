@@ -6,13 +6,14 @@ d.all <- read_sheet(
 )
 
 d.childlag <- d.all %>% filter(analysis == "childhood-lag")
-d.childlag <- d.childlag %>% rowwise() %>%
+d.childlag <- d.childlag %>%
+    rowwise() %>%
     mutate(
         d = d/Dosage
     ) %>%
     mutate(
-    n.c = n/2,
-    n.e = n/2,
+    n.c = `sample size`/2,
+    n.e = `sample size`/2,
     d_se = getDSE(d, n.e, n.c)
 ) %>% ungroup()
 
@@ -26,4 +27,4 @@ mod.1 <- rma.mv(yi = d, V = d_se^2,
 
 effect <- coef(mod.1)[[1]]; effect
 linear.growth <- abs(effect/27); linear.growth
-effectBy30 <- pracma::integral(function(t){0+linear.growth*t}, 0, 30); effectBy30
+effectBy30 <- pracma::integral(function(t){0+linear.growth*t}, 3, 30); effectBy30

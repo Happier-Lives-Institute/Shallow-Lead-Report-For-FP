@@ -26,5 +26,6 @@ mod.1 <- rma.mv(yi = d, V = d_se^2,
        data = d.childlag)
 
 effect <- coef(mod.1)[[1]]; effect
-linear.growth <- abs(effect/27); linear.growth
+linear.growth <- abs(effect/(27-3)); linear.growth
+effectAt30 <- effect + 3 * linear.growth; effectAt30
 effectBy30 <- pracma::integral(function(t){0+linear.growth*t}, 3, 30); effectBy30

@@ -260,7 +260,22 @@ BLLs_u10_weighted %>%
 lmer(BLL ~ year + (1|location), data = BLLs_u10_weighted)
 
 #~############################################################################~#
-# Applying to Ghana ----
+# Ban on leaded fuel ----
+#~############################################################################~#
+
+lead_ban <- read_csv(
+    "data/OWID/lead-petrol-ban.csv"
+    , show_col_types = F
+)
+
+lead_ban <- lead_ban %>% filter(lead_petrol_banned == "Yes") %>%
+    group_by(Entity) %>% mutate(min_year = min(Year)) %>% ungroup() %>%
+    filter(Year == min_year)
+
+lead_ban %>% filter(Entity %in% c("Ghana", "Bangladesh", "India"))
+
+#~############################################################################~#
+# Ghana ----
 #~############################################################################~#
 
 #~=======================================================~=
@@ -270,7 +285,8 @@ lmer(BLL ~ year + (1|location), data = BLLs_u10_weighted)
 WPP_2023_Ghana <- WPP %>% filter(year == 2023) %>% filter(location == "Ghana")
 # sum(WPP_2023_Ghana$PopTotal) # check total population
 WPP_2023_Ghana %>% filter(AgeGrpStart <= 10) %>% summarise(
-    age = weighted.mean(AgeGrpStart, PopTotal, na.rm = TRUE)
+    age = weighted.mean(AgeGrpStart, PopTotal, na.rm = TRUE),
+    total = sum(PopTotal)
 )
 
 #~=======================================================~=
@@ -310,20 +326,76 @@ exp(-0.02921)
 BLLs_u10_weighted_Ghana %>% filter(year == 2024-6) %>% pull(BLL)
 4.323246 - (4.323246 * exp(-0.02921*6))
 
-
-# BLL_years_Ghana_nls <- nls(
-#     BLL ~ BLL_0 * exp(-lambda * (year_maxed_1 - t0)),
-#     data = BLLs_u10_weighted_Ghana,
-#     start =
-#         list(
-#             BLL_0 = 5,
-#             lambda = 0.0001,
-#             t0 = 1
-#             ),
-#     control = nls.control(maxiter = 10000, tol = 1e-10)
-#     )
+#~############################################################################~#
+# India ----
+#~############################################################################~#
 
 #~=======================================================~=
-## Counterfactual BLLs over time in Ghana ----
+## Average age for <= 10 y.o. ----
 #~=======================================================~=
 
+WPP_2023_India <- WPP %>% filter(year == 2023) %>% filter(location == "India")
+# sum(WPP_2023_India$PopTotal) # check total population
+WPP_2023_India %>% filter(AgeGrpStart <= 10) %>% summarise(
+    age = weighted.mean(AgeGrpStart, PopTotal, na.rm = TRUE),
+    total = sum(PopTotal)
+)
+
+# Get proportion that is under 10years to apply to the states
+india_per_un10 <-
+    (WPP_2023_India %>% filter(AgeGrpStart <= 10) %>% summarise(n = sum(PopTotal))) %>% pull(n) /
+    (WPP_2023_India %>% summarise(n = sum(PopTotal))) %>% pull(n)
+
+# We also want the specific population of the indian states
+# Chhattisgarh and Madhya Pradesh
+indian_census_2011 <- readxl::read_xlsx(
+    "data/indian census 2011/A-1_NO_OF_VILLAGES_TOWNS_HOUSEHOLDS_POPULATION_AND_AREA.xlsx",
+    sheet = "machine_readable_copy"
+)
+indian_census_2011 %>% filter(area == "STATE") %>%
+    filter(name %in% c("CHHATTISGARH", "MADHYA PRADESH")) %>%
+    filter(rural_urban_total == "Total") %>%
+    select(name, persons) %>%
+    mutate(un10 = persons * india_per_un10)
+
+#~=======================================================~=
+## BLLs ----
+#~=======================================================~=
+
+BLLs_u10_weighted_India <- BLLs_u10_weighted %>% filter(location == "India") %>%
+    mutate(year_maxed = year - min(year), year_maxed_1 = year - min(year) + 1)
+BLLs_u10_weighted_India %>% filter(year == 2021) %>% pull(BLL)
+
+# actually, what we want is the BLLs for the specific region:
+# Chhattisgarh and Madhya Pradesh
+# assume the same proportion in ages from India more generally
+
+## Chhattisgarh
+BLLs_u10_ind_chh <- IHME_both %>% filter(location == "Chhattisgarh") %>%
+    select(location, year, age_group_label, BLL) %>%
+    left_join(
+        age_years_all_locations_time %>% filter(location == "India"),
+        by = c("year", "age_group_label")
+        ) %>% select(-LocTypeName) %>%
+    filter(age <= 10)
+BLLs_u10_weighted_ind_chh <- BLLs_u10_ind_chh %>% group_by(year) %>%
+    summarise(
+        BLL = weighted.mean(BLL, PopTotal, na.rm = TRUE)
+    ) %>%
+    ungroup()
+BLLs_u10_weighted_ind_chh %>% filter(year == 2021) %>% pull(BLL)
+
+## Madhya Pradesh
+BLLs_u10_ind_mp <- IHME_both %>% filter(location == "Madhya Pradesh") %>%
+    select(location, year, age_group_label, BLL) %>%
+    left_join(
+        age_years_all_locations_time %>% filter(location == "India"),
+        by = c("year", "age_group_label")
+    ) %>% select(-LocTypeName) %>%
+    filter(age <= 10)
+BLLs_u10_weighted_ind_mp <- BLLs_u10_ind_mp %>% group_by(year) %>%
+    summarise(
+        BLL = weighted.mean(BLL, PopTotal, na.rm = TRUE)
+    ) %>%
+    ungroup()
+BLLs_u10_weighted_ind_mp %>% filter(year == 2021) %>% pull(BLL)

@@ -269,10 +269,30 @@ lead_ban <- read_csv(
 )
 
 lead_ban <- lead_ban %>% filter(lead_petrol_banned == "Yes") %>%
-    group_by(Entity) %>% mutate(min_year = min(Year)) %>% ungroup() %>%
+    group_by(Entity) %>%
+    mutate(min_year = min(Year)) %>% ungroup() %>%
     filter(Year == min_year)
 
 lead_ban %>% filter(Entity %in% c("Ghana", "Bangladesh", "India"))
+
+
+#~############################################################################~#
+# Regulation versus reality
+#~############################################################################~#
+
+reg <- read_csv("data/OWID/legal-controls-lead-paint.csv")
+
+reg %<>% rename(paint_reg_year = Year) %>% select(-Code)
+
+paint_lead <- read_csv("data/OWID/lead-paint-over-90ppm.csv")
+
+paint_lead %<>%  rename(test_year = Year)
+
+regreal <- left_join(paint_lead, reg)
+
+regreal %>% group_by(lead_paint_regulation) %>%
+    summarise(n = n(),
+              share_leaded = mean(share_paints_exceeding_90ppm_lead, na.rm = TRUE))
 
 #~############################################################################~#
 # Ghana ----

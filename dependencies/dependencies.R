@@ -99,6 +99,8 @@ library(meta)
 library(metafor)
 library(broom)
 library(magrittr)
+library(lme4)
+library(lmerTest)
 
 # Libraries for rmd
 library(kableExtra)
@@ -119,5 +121,7 @@ suppressMessages(devtools::source_url("https://raw.githubusercontent.com/Happier
 suppressMessages(devtools::source_url("https://raw.githubusercontent.com/Happier-Lives-Institute/general-functions/main/functions_cohen_d.R"))
 # For meta-analysis functions
 suppressMessages(devtools::source_url("https://raw.githubusercontent.com/Happier-Lives-Institute/general-functions/main/functions_meta_analysis.R"))
+# Custom themes and styles
+suppressMessages(devtools::source_url("https://raw.githubusercontent.com/Happier-Lives-Institute/general-functions/main/functions_styles.R"))
 # grid approximation function
 suppressMessages(devtools::source_url("https://raw.githubusercontent.com/Karakaii/grid_approximation/main/grid_approximation.R"))

@@ -15,7 +15,14 @@ dat_lead <- read_sheet(
 # Wrangle
 dat_lead <- dat_lead %>%
     # Make sure we have just the analysis for childhood
-    filter(analysis == "childhood-lag") %>%
+    filter(analysis == "childhood-lag")
+
+# For now we cannot use the K&Z data
+dat_lead_KZ <- dat_lead
+dat_lead <- dat_lead %>% filter(authors != "Keyes & Zahran")
+
+# Version where we dose adjust first
+dat_lead_1 <- dat_lead %>%
     # calculate effect size
     mutate(
         study_label_outcome = paste0(study_label, " (", outcome_general, ")"),
@@ -28,6 +35,30 @@ dat_lead <- dat_lead %>%
         g = get_g(d, n_t, n_c),
         g_se = get_d_se(d, n_t, n_c),
         g_var = g_se^2,
+        g_se_corrected = get_corrected_se_smd(n_t, n_c),
+        g_var_corrected = g_se_corrected^2,
+        ci_lb = g - 1.96*g_se,
+        ci_ub = g + 1.96*g_se,
+        ci_lb_corrected = g - 1.96*g_se_corrected,
+        ci_ub_corrected = g + 1.96*g_se_corrected,
+    )
+
+# Version where we dose adjust after
+dat_lead_2 <- dat_lead %>%
+    # calculate effect size
+    mutate(
+        study_label_outcome = paste0(study_label, " (", outcome_general, ")"),
+        t = m_diff / m_diff_se,
+        n_t = n/2,
+        n_c = n/2,
+        d = t * sqrt((1/n_t) + (1/n_c)),
+        d = ifelse(str_detect(higher_better_swb, "^F"), d*-1, d),
+        # d = d/exposure_dose,
+        g = get_g(d, n_t, n_c),
+        g_se = get_d_se(d, n_t, n_c),
+        g_var = g_se^2,
+        g_se_corrected = get_corrected_se_smd(n_t, n_c),
+        g_var_corrected = g_se_corrected^2,
         ci_lb = g - 1.96*g_se,
         ci_ub = g + 1.96*g_se,
     )
@@ -40,20 +71,61 @@ dat_lead <- dat_lead %>%
 ## Effect ----
 #~=======================================================~=
 
-# Effect size
-ma_lead_l3 <- rma.mv(
-    data = dat_lead,
+## Include K&Z
+ma_lead_l3_KZ <- rma.mv(
+    data = dat_lead_KZ %>%
+        # filter(authors == "Keyes & Zahran") %>%
+        mutate(
+            study_label_outcome = paste0(study_label, " (", outcome_general, ")"),
+            t = m_diff / m_diff_se,
+            n_t = n/2,
+            n_c = n/2,
+            d = t * sqrt((1/n_t) + (1/n_c)),
+            d = ifelse(str_detect(higher_better_swb, "^F"), d*-1, d),
+            d = d/exposure_dose,
+            g = get_g(d, n_t, n_c),
+            g_se = get_d_se(d, n_t, n_c),
+            g_var = g_se^2,
+            ci_lb = g - 1.96*g_se,
+            ci_ub = g + 1.96*g_se,
+        ),
     yi = g, V = g_var,
     random = ~1 | study_label/study_label_outcome,
     slab = study_label_outcome,
     method = "REML", test = "t",
-); summary(ma_lead_l3)
+); summary(ma_lead_l3_KZ)
+
+
+## Dosage adjust first
+
+# Effect size
+ma_lead_l3_1 <- rma.mv(
+    data = dat_lead_1,
+    yi = g, V = g_var,
+    random = ~1 | study_label/study_label_outcome,
+    slab = study_label_outcome,
+    method = "REML", test = "t",
+); summary(ma_lead_l3_1)
 
 # Forest plot
-forest(ma_lead_l3)
+forest(ma_lead_l3_1)
 
 # Funnel plot
-my_funnel_rma.mv(ma_lead_l3)
+my_funnel_rma.mv(ma_lead_l3_1)
+
+## Corrected SE
+
+# Effect size
+ma_lead_l3_corrected <- rma.mv(
+    data = dat_lead_1,
+    yi = g, V = g_var_corrected,
+    random = ~1 | study_label/study_label_outcome,
+    slab = study_label_outcome,
+    method = "REML", test = "t",
+); summary(ma_lead_l3_corrected)
+
+# Forest plot
+forest(ma_lead_l3_corrected)
 
 #~=======================================================~=
 ## Trajectory over time ----
@@ -65,7 +137,7 @@ avg_follow_up_age; dat_lead %>% pull(age) %>% range()
 effect_per_year <- ma_lead_l3$b[1]/avg_follow_up_age
 effect_per_year
 
-age_of_development <- 30 # assumption
+age_of_development <- 27 # assumption
 
 age_variations <- data.frame(
     age_of_exposure = 0:20,

@@ -134,7 +134,7 @@ forest(ma_lead_l3_corrected)
 avg_follow_up_age <- dat_lead %>% pull(age) %>% mean()
 avg_follow_up_age; dat_lead %>% pull(age) %>% range()
 
-effect_per_year <- ma_lead_l3$b[1]/avg_follow_up_age
+effect_per_year <- ma_lead_l3_1$b[1]/avg_follow_up_age
 effect_per_year
 
 age_of_development <- 27 # assumption

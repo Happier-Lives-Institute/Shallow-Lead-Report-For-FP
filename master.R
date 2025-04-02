@@ -257,7 +257,7 @@ IHME_both <- IHME_both %>%
         age_group_name == "12 to 23 months" ~ "Age 1",
         .default = age_group_name
     )
-) %>% group_by(location, year, age_group_label) %>%
+    ) %>% group_by(location, year, age_group_label) %>%
     mutate(BLL = mean(mean)) %>%
     ungroup() %>% ungroup() %>% ungroup() %>%
     mutate(row_label = paste(location, year, age_group_label)) %>%
@@ -404,7 +404,7 @@ BLLs_u10_weighted_Ghana %>%
     coord_cartesian(
         xlim = c(2011, 2021),
         ylim = c(0, max(BLLs_u10_weighted_Ghana$BLL, na.rm = TRUE)+1)
-        ) +
+    ) +
     scale_x_continuous(breaks = seq(2011, 2021, 1)) +
     theme_hli_wbg()
 
@@ -468,7 +468,7 @@ BLLs_u10_ind_chh <- IHME_both %>% filter(location == "Chhattisgarh") %>%
     left_join(
         age_years_all_locations_time %>% filter(location == "India"),
         by = c("year", "age_group_label")
-        ) %>% select(-LocTypeName) %>%
+    ) %>% select(-LocTypeName) %>%
     filter(age <= 10)
 BLLs_u10_weighted_ind_chh <- BLLs_u10_ind_chh %>% group_by(year) %>%
     summarise(
@@ -491,3 +491,154 @@ BLLs_u10_weighted_ind_mp <- BLLs_u10_ind_mp %>% group_by(year) %>%
     ) %>%
     ungroup()
 BLLs_u10_weighted_ind_mp %>% filter(year == 2021) %>% pull(BLL)
+
+#~############################################################################~#
+# BLLs in the world ----
+#~############################################################################~#
+
+#~=======================================================~=
+## Data prep ----
+#~=======================================================~=
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### All ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+BLLs_world_latest <- BLLs %>% group_by(location) %>%
+    mutate(max_year = max(year)) %>%
+    filter(year == max_year) %>%
+    mutate(average_BLL = weighted.mean(BLL, PopTotal, na.rm = TRUE)) %>%
+    ungroup() %>%
+    filter(!duplicated(location)) %>%
+    select(-age, -age_group_label, -PopTotal, -BLL)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Children under 10 ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+BLLs_world_latest_u10 <- BLLs_u10_weighted %>% group_by(location) %>%
+    mutate(max_year = max(year)) %>%
+    filter(year == max_year) %>%
+    ungroup() %>%
+    rename(average_BLL = BLL)
+
+#~=======================================================~=
+## Map prep ----
+#~=======================================================~=
+
+# Tidyverse comes with map data from the world.
+world_map <- map_data("world")
+
+# Need to align the naming
+BLLs_world_latest %>% filter(location %ni% world_map$region) %>%
+    pull(location) %>% unique()
+world_map %>% arrange(region) %>% pull(region) %>% unique()
+world_map %>% arrange(subregion) %>% pull(subregion) %>% unique()
+
+world_map <- world_map %>% filter(region != "Antarctica") %>%
+    mutate(
+        region = case_when(
+            subregion == "Northern Cyprus" ~ "Northern Cyprus",
+            subregion == "Hong Kong" ~ "Hong Kong",
+            subregion == "Somaliland" ~ "Somaliland region",
+            subregion == "Tokelau" ~ "Tokelau",
+            subregion == "Tuvalu" ~ "Tuvalu",
+            TRUE ~ region
+        )
+    ) %>%
+    mutate(
+        region = recode(
+            region,
+            "USA" = "United States of America" ,
+            "UK" = "United Kingdom",
+            # "Democratic Republic of the Congo" = "Democratic Republic of Congo",
+            "Republic of Congo" = "Congo",
+            "Ivory Coast" = "Côte d'Ivoire",
+            "Trinidad" = "Trinidad and Tobago",
+            "Czech Republic" = "Czechia",
+            "Swaziland" = "Eswatini",
+            "Antigua" = "Antigua and Barbuda",
+            "Bolivia" = "Bolivia (Plurinational State of)",
+            "Brunei" = "Brunei Darussalam",
+            "Cape Verde" = "Cabo Verde",
+            "Vietnam" = "Viet Nam",
+            "Venezuela" = "Venezuela (Bolivarian Republic of)",
+            "Tanzania" = "United Republic of Tanzania",
+            "Syria" = "Syrian Arab Republic",
+            "North Korea" = "Democratic People's Republic of Korea",
+            "Iran" = "Iran (Islamic Republic of)",
+            "Laos" = "Lao People's Democratic Republic",
+            "Moldova" = "Republic of Moldova",
+            "Russia" = "Russian Federation",
+            "South Korea" = "Republic of Korea",
+            "Taiwan" = "Taiwan (Province of China)",
+            "Virgin Islands" = "United States Virgin Islands",
+            "Micronesia" = "Micronesia (Federated States of)",
+            "Saint Kitts" = "Saint Kitts and Nevis",
+            "Saint Vincent" = "Saint Vincent and the Grenadines",
+        )
+    )
+
+# When mapping the world it is important to:
+# 1. keep the data in the world variable
+# 2. use 'region' as the name
+# 3. set the limits to coord_sf(xlim = c(-180, 180), ylim = c(-65, 90))
+# -90 for ylim if you want Antarctica
+
+#~=======================================================~=
+## Graph ----
+#~=======================================================~=
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### All ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+p_world_all <- world_map %>% left_join(BLLs_world_latest, by = c("region" = "location")) %>%
+    ggplot(aes(x = long, y = lat, group = group)) +
+    geom_polygon(aes(fill = average_BLL)) +
+    coord_sf(xlim = c(-180, 180), ylim = c(-65, 90)) +
+    scale_fill_viridis_c(option = "magma", direction = -1) +
+    theme_void() +
+    theme(
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "white", colour = NA),
+        plot.background = element_rect(fill = "white", colour = NA)
+    ) +
+    labs(
+        title = "Average Blood Lead Levels",
+        subtitle = "Weighted by Population",
+        fill = "Blood Lead Level (µg/dL)"
+    ); p_world_all
+
+ggsave(
+    "graphs/world_all.png",
+    p_world_all,
+    width = 10, height = 5
+)
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+### Children under 10 ----
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+p_world_children <- world_map %>% left_join(BLLs_world_latest_u10, by = c("region" = "location")) %>%
+    ggplot(aes(x = long, y = lat, group = group)) +
+    geom_polygon(aes(fill = average_BLL)) +
+    coord_sf(xlim = c(-180, 180), ylim = c(-65, 90)) +
+    scale_fill_viridis_c(option = "magma", direction = -1) +
+    theme_void() +
+    theme(
+        legend.position = "bottom",
+        panel.background = element_rect(fill = "white", colour = NA),
+        plot.background = element_rect(fill = "white", colour = NA)
+    ) +
+    labs(
+        title = "Average Blood Lead Levels in Children Under 10",
+        subtitle = "Weighted by Population",
+        fill = "Blood Lead Level (µg/dL)"
+    ); p_world_children
+
+ggsave(
+    "graphs/world_children.png",
+    p_world_children,
+    width = 10, height = 5
+)

@@ -512,6 +512,11 @@ BLLs_world_latest <- BLLs %>% group_by(location) %>%
     filter(!duplicated(location)) %>%
     select(-age, -age_group_label, -PopTotal, -BLL)
 
+write_csv(
+    BLLs_world_latest,
+    "data/BLLs_world_latest.csv"
+)
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ### Children under 10 ----
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -521,6 +526,11 @@ BLLs_world_latest_u10 <- BLLs_u10_weighted %>% group_by(location) %>%
     filter(year == max_year) %>%
     ungroup() %>%
     rename(average_BLL = BLL)
+
+write_csv(
+    BLLs_world_latest_u10,
+    "data/BLLs_world_latest_u10.csv"
+)
 
 #~=======================================================~=
 ## Map prep ----
@@ -597,7 +607,7 @@ p_world_all <- world_map %>% left_join(BLLs_world_latest, by = c("region" = "loc
     ggplot(aes(x = long, y = lat, group = group)) +
     geom_polygon(aes(fill = average_BLL)) +
     coord_sf(xlim = c(-180, 180), ylim = c(-65, 90)) +
-    scale_fill_viridis_c(option = "magma", direction = -1) +
+    scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey80") +
     theme_void() +
     theme(
         legend.position = "bottom",
@@ -624,7 +634,7 @@ p_world_children <- world_map %>% left_join(BLLs_world_latest_u10, by = c("regio
     ggplot(aes(x = long, y = lat, group = group)) +
     geom_polygon(aes(fill = average_BLL)) +
     coord_sf(xlim = c(-180, 180), ylim = c(-65, 90)) +
-    scale_fill_viridis_c(option = "magma", direction = -1) +
+    scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey80") +
     theme_void() +
     theme(
         legend.position = "bottom",
